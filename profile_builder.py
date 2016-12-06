@@ -13,28 +13,38 @@ import json
 from flask import jsonify
 import MySQLdb as MySQL
 
+import os
+dir_path = os.path.dirname(os.path.realpath(__file__))+"/"
+
+
 counter = 943
 user = []
 item = []
 
 d = Dataset()
-d.load_users("data/u.user", user)
-d.load_items("data/u.item", item)
+d.load_users(dir_path+"data/u.user", user)
+d.load_items(dir_path+"data/u.item", item)
 
+input_movies = []
 
 global_asks = []
 
 
 def supply_sample_movies():
     random_movies = random.sample(item, 10)
+    input_movies = random_movies
+
+    movie_names = []
+    for movie in input_movies:
+        movie_names.append(movie.name_string)
     return random_movies
 
 
-def return_preferred_genres(input_movies, user_ratings, age, gender, occupation, user_id):
+def return_preferred_genres(user_ratings, age, gender, occupation, user_id):
     n_users = len(user)
     n_items = len(item)
 
-    utility_matrix = pickle.load(open("utility_matrix.pkl", "rb"))
+    utility_matrix = pickle.load(open(dir_path+"utility_matrix.pkl", "rb"))
 
     # Find the average rating for each user and stores it in the user's object
     for i in range(0, n_users):
