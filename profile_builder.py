@@ -10,11 +10,12 @@ import random
 import sys
 import time
 import json
+import traceback
 from flask import jsonify
 import MySQLdb as MySQL
 
 import os
-dir_path = os.path.dirname(os.path.realpath(__file__))+"/"
+dir_path = os.path.dirname(os.path.realpath(__file__)) + "/"
 
 
 counter = 943
@@ -22,12 +23,10 @@ user = []
 item = []
 
 d = Dataset()
-d.load_users(dir_path+"data/u.user", user)
-d.load_items(dir_path+"data/u.item", item)
+d.load_users(dir_path + "data/u.user", user)
+d.load_items(dir_path + "data/u.item", item)
 
 input_movies = []
-
-global_asks = []
 
 
 def supply_sample_movies():
@@ -36,53 +35,37 @@ def supply_sample_movies():
 
     movie_names = []
     for movie in input_movies:
-        movie_names.append(movie.name_string)
-    return random_movies
+        movie_names.append(movie.title)
+    return movie_names
 
 
 def return_preferred_genres(user_ratings, age, gender, occupation, user_id):
     n_users = len(user)
     n_items = len(item)
 
-    utility_matrix = pickle.load(open(dir_path+"utility_matrix.pkl", "rb"))
+    utility_matrix = pickle.load(open(dir_path + "utility_matrix.pkl", "rb"))
 
     # Find the average rating for each user and stores it in the user's object
     for i in range(0, n_users):
         x = utility_matrix[i]
         user[i].avg_r = sum(a for a in x if a > 0) / sum(a > 0 for a in x)
 
-    # Find the Pearson Correlation Similarity Measure between two users
-    def pcs(x, y, ut):
-        num = 0
-        den1 = 0
-        den2 = 0
-        A = ut[x - 1]
-        B = ut[y - 1]
-        num = sum((a - user[x - 1].avg_r) * (b - user[y - 1].avg_r)
-                  for a, b in zip(A, B) if a > 0 and b > 0)
-        den1 = sum((a - user[x - 1].avg_r) ** 2 for a in A if a > 0)
-        den2 = sum((b - user[y - 1].avg_r) ** 2 for b in B if b > 0)
-        den = (den1 ** 0.5) * (den2 ** 0.5)
-        if den == 0:
-            return 0
-        else:
-            return num / den
-
     # Perform clustering on items
     movie_genre = []
     for movie in item:
-        movie_genre.append([movie.unknown, movie.action, movie.adventure, movie.animation, movie.childrens, movie.comedy,
-                            movie.crime, movie.documentary, movie.drama, movie.fantasy, movie.film_noir, movie.horror,
+        movie_genre.append([movie.unknown, movie.action, movie.adventure, movie.animation, movie.childrens, movie.comedy, movie.crime, movie.documentary, movie.drama, movie.fantasy, movie.film_noir, movie.horror,
                             movie.musical, movie.mystery, movie.romance, movie.sci_fi, movie.thriller, movie.war, movie.western])
 
     movie_genre = np.array(movie_genre)
     cluster = KMeans(n_clusters=19)
     cluster.fit_predict(movie_genre)
 
-    ask = global_asks
+    global input_movies
+    movies = input_movies
+
     new_user = np.zeros(19)
 
-    for i, movie in enumerate(input_movies):
+    for i, movie in enumerate(movies):
         a = user_ratings[i]
         if new_user[cluster.labels_[movie.id - 1]] != 0:
             new_user[cluster.labels_[movie.id - 1]
@@ -91,21 +74,22 @@ def return_preferred_genres(user_ratings, age, gender, occupation, user_id):
             new_user[cluster.labels_[movie.id - 1]] = a
 
     utility_new = np.vstack((utility_matrix, new_user))
-    global counter
-    counter+=1
-    user.append(User(counter, age, gender, occupation, 100000+user_id))
+
+    user.append(User(944, age, gender, occupation, 110018))
+    #user.append(User(944, age, gender, occupation, 100000+user_id))
 
     pcs_matrix = np.zeros(n_users)
 
-    #print "Finding users which have similar preferences."
+    print "Finding users which have similar preferences."
     for i in range(0, n_users + 1):
-        if i != counter-1:
-            pcs_matrix[i] = pcs(counter, i + 1, utility_new)
+        if i != 943:
+            pcs_matrix[i] = pcs(944, i + 1, utility_new)
 
     user_index = []
     for i in user:
         user_index.append(i.id - 1)
-    user_index = user_index[:counter-1]
+
+    user_index = user_index[:943]
     user_index = np.array(user_index)
 
     top_5 = [x for (y, x) in sorted(zip(pcs_matrix, user_index),
@@ -113,6 +97,7 @@ def return_preferred_genres(user_ratings, age, gender, occupation, user_id):
     top_5 = top_5[:5]
 
     top_5_genre = []
+
 
     for i in range(0, 5):
         maxi = 0
@@ -189,14 +174,34 @@ def return_preferred_genres(user_ratings, age, gender, occupation, user_id):
         conn = MySQL.connect(host="127.0.0.1", user="root", passwd="cs411fa2016", db="imdb")
         cursor = conn.cursor()
         for genre in preferred_genres_ids:
-            query = "INSERT INTO UserGenre(UserID,GenreID) VALUES(%d,%d)" % user_id, genre
+            query = "INSERT INTO UserGenre(UserID,GenreID) VALUES(%d,%d)" % (user_id, genre)
             try:
                 x = cursor.execute(query)
+                conn.commit()
             except MySQL.Error as e:
                 conn.rollback()
                 raise
                 return False, None, "SQL connection error"
-    except:
+    except MySQL.Error as e:
+        traceback.print_exc()
         print "SQL Connection Error"
 
     return list(set(preferred_genres_name))
+
+
+# Find the Pearson Correlation Similarity Measure between two users
+def pcs(x, y, ut):
+    num = 0
+    den1 = 0
+    den2 = 0
+    A = ut[x - 1]
+    B = ut[y - 1]
+    num = sum((a - user[x - 1].avg_r) * (b - user[y - 1].avg_r)
+              for a, b in zip(A, B) if a > 0 and b > 0)
+    den1 = sum((a - user[x - 1].avg_r) ** 2 for a in A if a > 0)
+    den2 = sum((b - user[y - 1].avg_r) ** 2 for b in B if b > 0)
+    den = (den1 ** 0.5) * (den2 ** 0.5)
+    if den == 0:
+        return 0
+    else:
+        return num / den
