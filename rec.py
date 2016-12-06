@@ -2,7 +2,7 @@
 import json
 from flask import jsonify
 import MySQLdb as MySQL
-
+import traceback
 
 
 # def rank_genre(userid,movielist):
@@ -36,8 +36,7 @@ def tryrec(userid):
     try:
         #fetch the user prefer runtime and year
         x = cursor.execute(state1)
-        if x == 0:
-            return None
+
 
         result = cursor.fetchone()
         Runtime = result[0]
@@ -45,8 +44,7 @@ def tryrec(userid):
 
         #fecth user prefer top 5 genreid
         x = cursor.execute(state2)
-        if x == 0:
-            return None
+
 
         results = cursor.fetchall()
         for result in results:
@@ -119,5 +117,6 @@ def tryrec(userid):
 
     except MySQL.Error as e:
         conn.rollback()
+        traceback.print_exc()
         raise
         return False, None, "SQL connection error"
